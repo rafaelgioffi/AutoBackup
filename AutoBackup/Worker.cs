@@ -149,7 +149,7 @@ namespace AutoBackup
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Falha ao criar ou atualizar o arquivo zip \"{zipFilePath}\"", zipFilePath);
+                _logger.LogError(ex, "Falha ao criar ou atualizar o arquivo zip \"{zipFilePath}\"...", zipFilePath);
             }
 
             // Simulação de trabalho assíncrono, se necessário. Em I/O real, os métodos já seriam async.
