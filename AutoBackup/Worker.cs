@@ -38,7 +38,7 @@ namespace AutoBackup
 
         private async Task ProcessFoldersAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Iniciando verificação das pastas às: {time}", DateTimeOffset.Now);
+            _logger.LogInformation("Iniciando verificação das pastas às: {time}", DateTimeOffset.Now.ToLocalTime());
 
             // A data limite para os arquivos serem considerados antigos.
             var dateThreshold = DateTime.Now.AddMonths(-_settings.FileAgeMonths);
@@ -46,7 +46,8 @@ namespace AutoBackup
 
             foreach (var folderPath in _settings.FoldersToMonitor)
             {
-                if (stoppingToken.IsCancellationRequested) break;
+                if (stoppingToken.IsCancellationRequested) 
+                    break;
 
                 if (!Directory.Exists(folderPath))
                 {
@@ -66,7 +67,17 @@ namespace AutoBackup
                         continue;
                     }
 
-                    await CompressFilesAsync(folderPath, filesToProcess);
+                    var filesGroupedByYear = filesToProcess.GroupBy(file => GetFileDate(file).Year);
+
+                    foreach (var yearGroup in filesGroupedByYear)
+                    {
+                        int year = yearGroup.Key;
+                        var filesForThisYear = yearGroup.ToList();
+
+                        _logger.LogInformation("Encontrados {count} arquivos criados/modificados em {year}...", filesForThisYear.Count, year);
+
+                        await CompressFilesByYearAsync(folderPath, year, filesForThisYear);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -75,6 +86,13 @@ namespace AutoBackup
             }
 
             _logger.LogInformation("Verificação das pastas concluída.");
+        }
+
+        private DateTime GetFileDate(FileInfo file)
+        {
+            return _settings.DateToCheck.Equals("LastWriteTime", StringComparison.OrdinalIgnoreCase) 
+                ? file.LastWriteTime 
+                : file.CreationTime; // Padrão é CreationTime
         }
 
         private List<FileInfo> GetFilesToProcess(string folderPath, DateTime dateThreshold)
@@ -88,17 +106,7 @@ namespace AutoBackup
                 // Ignora os próprios arquivos .zip gerados por este serviço
                 if (file.Extension.Equals(".zip", StringComparison.OrdinalIgnoreCase)) continue;
 
-                DateTime fileDate;
-                if (_settings.DateToCheck.Equals("LastWriteTime", StringComparison.OrdinalIgnoreCase))
-                {
-                    fileDate = file.LastWriteTime;
-                }
-                else
-                {
-                    fileDate = file.CreationTime; // Padrão é CreationTime
-                }
-
-                if (fileDate < dateThreshold)
+                if (GetFileDate(file) < dateThreshold)
                 {
                     filesToProcess.Add(file);
                 }
@@ -106,10 +114,9 @@ namespace AutoBackup
             return filesToProcess;
         }
 
-        private async Task CompressFilesAsync(string folderPath, List<FileInfo> files)
-        {
-            var currentYear = DateTime.Now.Year;
-            var zipFileName = $"{currentYear}.zip";
+        private async Task CompressFilesByYearAsync(string folderPath, int year, List<FileInfo> files)
+        {            
+            var zipFileName = $"{year}.zip";
             var zipFilePath = Path.Combine(folderPath, zipFileName);
 
             _logger.LogInformation("Compactando {count} arquivos para o arquivo \"{zipFilePath}\"", files.Count, zipFilePath);
@@ -126,7 +133,7 @@ namespace AutoBackup
                     {
                         // Adiciona o arquivo ao zip com a máxima compactação possível.
                         archive.CreateEntryFromFile(file.FullName, file.Name, CompressionLevel.SmallestSize);
-                        _logger.LogInformation("Arquivo \"{fileName}\" adicionado ao zip.", file.Name);
+                        _logger.LogInformation("Arquivo \"{fileName}\" adicionado ao {zipName}.", file.Name, zipFileName);
 
                         if (_settings.DeleteOriginalFileAfterZip)
                         {
@@ -136,7 +143,7 @@ namespace AutoBackup
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Falha ao processar o arquivo individual: \"{fileName}\"", file.Name);
+                        _logger.LogError(ex, "Falha ao processar o arquivo individual \"{fileName}\"", file.Name);
                     }
                 }
             }
