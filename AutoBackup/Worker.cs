@@ -115,7 +115,10 @@ namespace AutoBackup
         }
 
         private async Task CompressFilesByYearAsync(string folderPath, int year, List<FileInfo> files)
-        {            
+        {
+            int count = 0;
+            int filesCount = files.Count;
+
             var zipFileName = $"{year}.zip";
             var zipFilePath = Path.Combine(folderPath, zipFileName);
 
@@ -133,17 +136,21 @@ namespace AutoBackup
                     {
                         // Adiciona o arquivo ao zip com a máxima compactação possível.
                         archive.CreateEntryFromFile(file.FullName, file.Name, CompressionLevel.SmallestSize);
-                        _logger.LogInformation("Arquivo \"{fileName}\" adicionado ao {zipName}.", file.Name, zipFileName);
+                        _logger.LogInformation("[{count}/{filesCount}]   Arquivo \"{fileName}\" adicionado ao {zipName}.", count, filesCount, file.Name, zipFileName);
 
                         if (_settings.DeleteOriginalFileAfterZip)
                         {
                             file.Delete();
-                            _logger.LogInformation("Arquivo original \"{fileName}\" deletado.", file.Name);
+                            _logger.LogInformation("[{count}/{filesCount}]   Arquivo original \"{fileName}\" deletado.", count, filesCount, file.Name);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Falha ao processar o arquivo individual \"{fileName}\"", file.Name);
+                        _logger.LogError(ex, "[{count}/{filesCount}]   Falha ao processar o arquivo individual \"{fileName}\"", count, filesCount, file.Name);
+                    }
+                    finally
+                    {
+                        count++;                        
                     }
                 }
             }
