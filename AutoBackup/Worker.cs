@@ -10,7 +10,6 @@ namespace AutoBackup
         private readonly ILogger<Worker> _logger = logger;
         private readonly WorkerSettings _settings = settings.Value;
 
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("Executando o backup...");
@@ -164,14 +163,3 @@ namespace AutoBackup
         }
     }
 }
-
-
-public class WorkerSettings
-{
-    public List<string> FoldersToMonitor { get; set; } = [];
-    public int FileAgeMonths { get; set; }
-    public string DateToCheck { get; set; }
-    public int RunIntervalHours { get; set; }
-    public bool DeleteOriginalFileAfterZip { get; set; }
-}
-
